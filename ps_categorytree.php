@@ -78,6 +78,8 @@ class Ps_CategoryTree extends Module implements WidgetInterface
                 Configuration::updateValue('BLOCK_CATEG_SORT_WAY', Tools::getValue('BLOCK_CATEG_SORT_WAY'));
                 Configuration::updateValue('BLOCK_CATEG_SORT', Tools::getValue('BLOCK_CATEG_SORT'));
                 Configuration::updateValue('BLOCK_CATEG_ROOT_CATEGORY', Tools::getValue('BLOCK_CATEG_ROOT_CATEGORY'));
+                Configuration::updateValue('BLOCK_CATEG_TREE_EXPAND', Tools::getValue('BLOCK_CATEG_TREE_EXPAND'));
+                Configuration::updateValue('BLOCK_CATEG_CURRENT_EXPAND', Tools::getValue('BLOCK_CATEG_CURRENT_EXPAND'));
 
                 //$this->_clearBlockcategoriesCache();
 
@@ -231,6 +233,46 @@ class Ps_CategoryTree extends Module implements WidgetInterface
                             ),
                         )
                     ),
+                    array(
+                        'type' => 'switch',
+                        'label' => $this->getTranslator()->trans('Expand category tree to current category', array(), 'Modules.Categorytree.Admin'),
+                        'name' => 'BLOCK_CATEG_TREE_EXPAND',
+                        'required' => false,
+                        'is_bool' => true,
+                        'values' => array(
+                            array(
+                                'id' => 'active_on',
+                                'value' => 1,
+                                'label' => $this->trans('Enabled', array(), 'Admin.Global')
+                            ),
+                            array(
+                                'id' => 'active_off',
+                                'value' => 0,
+                                'label' => $this->trans('Disabled', array(), 'Admin.Global')
+                            )
+                        ),
+                        'hint' => $this->trans('Enable or disable expanding category tree to current category.', array(), 'Modules.Categorytree.Admin')
+                    ),
+                    array(
+                        'type' => 'switch',
+                        'label' => $this->getTranslator()->trans('Expand current category', array(), 'Modules.Categorytree.Admin'),
+                        'name' => 'BLOCK_CATEG_CURRENT_EXPAND',
+                        'required' => false,
+                        'is_bool' => true,
+                        'values' => array(
+                            array(
+                                'id' => 'active_on',
+                                'value' => 1,
+                                'label' => $this->trans('Enabled', array(), 'Admin.Global')
+                            ),
+                            array(
+                                'id' => 'active_off',
+                                'value' => 0,
+                                'label' => $this->trans('Disabled', array(), 'Admin.Global')
+                            )
+                        ),
+                        'hint' => $this->trans('Enable or disable expanding current category.', array(), 'Modules.Categorytree.Admin')
+                    ),
                 ),
                 'submit' => array(
                     'title' => $this->getTranslator()->trans('Save', array(), 'Admin.Actions'),
@@ -257,7 +299,9 @@ class Ps_CategoryTree extends Module implements WidgetInterface
             'BLOCK_CATEG_MAX_DEPTH' => Tools::getValue('BLOCK_CATEG_MAX_DEPTH', Configuration::get('BLOCK_CATEG_MAX_DEPTH')),
             'BLOCK_CATEG_SORT_WAY' => Tools::getValue('BLOCK_CATEG_SORT_WAY', Configuration::get('BLOCK_CATEG_SORT_WAY')),
             'BLOCK_CATEG_SORT' => Tools::getValue('BLOCK_CATEG_SORT', Configuration::get('BLOCK_CATEG_SORT')),
-            'BLOCK_CATEG_ROOT_CATEGORY' => Tools::getValue('BLOCK_CATEG_ROOT_CATEGORY', Configuration::get('BLOCK_CATEG_ROOT_CATEGORY'))
+            'BLOCK_CATEG_ROOT_CATEGORY' => Tools::getValue('BLOCK_CATEG_ROOT_CATEGORY', Configuration::get('BLOCK_CATEG_ROOT_CATEGORY')),
+            'BLOCK_CATEG_TREE_EXPAND' => Tools::getValue('BLOCK_CATEG_TREE_EXPAND', Configuration::get('BLOCK_CATEG_TREE_EXPAND')),
+            'BLOCK_CATEG_CURRENT_EXPAND' => Tools::getValue('BLOCK_CATEG_CURRENT_EXPAND', Configuration::get('BLOCK_CATEG_CURRENT_EXPAND')),
         );
     }
 
@@ -296,9 +340,50 @@ class Ps_CategoryTree extends Module implements WidgetInterface
             }
         }
 
+        $categories = $this->getCategories($category);
+
+        $currentPath = null;
+
+        if (
+            isset($categories['children']) &&
+            count($categories['children']) &&
+            method_exists($this->context->controller, 'getCategory') &&
+            method_exists($this, 'getTreePath') &&
+            Configuration::get('BLOCK_CATEG_TREE_EXPAND')
+        ) {
+            $currentCategory = $this->context->controller->getCategory();
+            $currentPath = self::getTreePath($categories['children'], $currentCategory->id);
+        }
+
         return [
-            'categories' => $this->getCategories($category),
+            'categories' => $categories,
+            'currentPath' => $currentPath,
             'currentCategory' => $category->id,
         ];
+    }
+
+    public static function getTreePath($categories, $id, array $path = [])
+    {
+        foreach ($categories as $cate) {
+            if ($cate['id'] == $id) {
+                if (Configuration::get('BLOCK_CATEG_CURRENT_EXPAND')) {
+                    $path[] = $id;
+                }
+
+                return $path;
+            }
+
+            $path[] = $cate['id'];
+
+            if (is_array($cate['children']) && count($cate['children'])) {
+                if ($result = self::getTreePath($cate['children'], $id, $path)) {
+                    return $result;
+                }
+            }
+
+            array_pop($path);
+        }
+
+        return false;
     }
 }
